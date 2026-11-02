@@ -1,0 +1,20 @@
+@import "tailwindcss";
+@theme {
+  --font-mono: ui-monospace, 'Noto Sans Tamil', monospace;
+  --font-sans: 'Noto Sans Tamil', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Times New Roman', 'Noto Sans Tamil', serif;
+  --color-slate-950: #0b1426;
+  --color-slate-900: #122038;
+  --color-slate-50: #f6f5f1;
+}
+:root { --brand-navy: #0b1426; --brand-gold: #c49a36; --brand-paper: #f6f5f1; }
+body { margin: 0; background: var(--brand-paper); }
+button:focus-visible, a:focus-visible { outline: 2px solid #a77c22; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+
+button[class*="bg-[#c49a36]"] { color: var(--brand-navy); }
+
+@font-face { font-family: 'Noto Sans Tamil'; font-style: normal; font-display: swap; font-weight: 400; src: url('/fonts/noto-sans-tamil-tamil-400-normal.woff2') format('woff2'); unicode-range: U+0964-0965,U+0B82-0BFA,U+200C-200D,U+20B9,U+25CC; }
+@font-face { font-family: 'Noto Sans Tamil'; font-style: normal; font-display: swap; font-weight: 700; src: url('/fonts/noto-sans-tamil-tamil-700-normal.woff2') format('woff2'); unicode-range: U+0964-0965,U+0B82-0BFA,U+200C-200D,U+20B9,U+25CC; }

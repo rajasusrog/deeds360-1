@@ -1,0 +1,109 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account profile with server-controlled role-based access control",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "email": { "type": "string", "format": "email", "minLength": 3, "maxLength": 254 },
+        "photo": { "type": "string", "maxLength": 1024 },
+        "role": {
+          "type": "string",
+          "enum": ["Super Admin", "Admin", "Lawyer", "Document Writer", "Broker", "Client", "Auditor", "Data Entry Operator"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Approved", "Pending Approval", "Suspended", "Deleted"]
+        },
+        "organization": { "type": "string", "maxLength": 255 },
+        "revision": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["uid", "name", "email", "role", "status", "revision", "createdAt"]
+    },
+    "Document": {
+      "title": "Deed Document Draft",
+      "description": "Tamil Nadu registration deed document draft scoped to creator/assignee workspace",
+      "type": "object",
+      "properties": {
+        "docNo": { "type": "string", "minLength": 3, "maxLength": 100 },
+        "docType": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "subType": { "type": "string", "maxLength": 100 },
+        "partiesCount": { "type": "number" },
+        "propertyAddress": { "type": "string", "maxLength": 1000 },
+        "consideration": { "type": "number" },
+        "status": {
+          "type": "string",
+          "enum": ["Draft", "In Progress", "Ready", "Completed", "Approved", "Finalized"]
+        },
+        "writer": { "type": "string", "maxLength": 255 },
+        "progress": { "type": "number" },
+        "createdBy": { "type": "string", "minLength": 3, "maxLength": 254 },
+        "createdByUserId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdByEmail": { "type": "string", "minLength": 3, "maxLength": 254 },
+        "assignedToUserId": { "type": "string", "maxLength": 128 },
+        "revision": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 },
+        "modifiedAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["docNo", "docType", "status", "createdBy", "createdByUserId", "createdByEmail", "revision", "createdAt", "modifiedAt"]
+    },
+    "Client": {
+      "title": "Client Profile",
+      "description": "Client identity and address record scoped to creator/assignee workspace",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 255 },
+        "fatherName": { "type": "string", "maxLength": 255 },
+        "dob": { "type": "string", "maxLength": 50 },
+        "age": { "type": "number" },
+        "occupation": { "type": "string", "maxLength": 255 },
+        "address": { "type": "string", "maxLength": 1000 },
+        "phone": { "type": "string", "maxLength": 50 },
+        "email": { "type": "string", "maxLength": 254 },
+        "createdByUserId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "createdByEmail": { "type": "string", "minLength": 3, "maxLength": 254 },
+        "assignedToUserId": { "type": "string", "maxLength": 128 },
+        "revision": { "type": "number" },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["name", "createdByUserId", "createdByEmail", "revision", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "Security Audit Log",
+      "description": "Immutable system event and security audit trail entry",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "maxLength": 64 },
+        "type": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "ip": { "type": "string", "maxLength": 64 },
+        "device": { "type": "string", "maxLength": 128 },
+        "browser": { "type": "string", "maxLength": 128 },
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "userEmail": { "type": "string", "minLength": 3, "maxLength": 254 }
+      },
+      "required": ["timestamp", "type", "message", "userId", "userEmail"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User account profiles with locked authorization fields"
+    },
+    "/documents/{documentId}": {
+      "schema": { "$ref": "#/entities/Document" },
+      "description": "Owner/assignee-isolated deed drafts and documents"
+    },
+    "/clients/{clientId}": {
+      "schema": { "$ref": "#/entities/Client" },
+      "description": "Owner/assignee-isolated client records"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable system audit trail entries"
+    }
+  }
+}

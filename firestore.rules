@@ -1,0 +1,289 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // GLOBAL SAFETY NET — Default Deny Catch-All
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // PRIMITIVE HELPERS
+    // Never recognize administrators via substring matching (e.g., '.*admin.*').
+    // Never grant global read/write access to all signed-in users.
+    // =========================================================================
+    function isSignedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isSuperAdminAllowlisted() {
+      return isSignedIn() && request.auth.token.email in [
+        'raj.asusrog@gmail.com',
+        'clearfile360@gmail.com'
+      ];
+    }
+
+    function hasApprovedProfile() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'Approved';
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn() && (
+        isSuperAdminAllowlisted() ||
+        (
+          hasApprovedProfile() &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Super Admin'
+        )
+      );
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        isSuperAdmin() ||
+        (
+          hasApprovedProfile() &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Admin'
+        )
+      );
+    }
+
+    function isAuditor() {
+      return hasApprovedProfile() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Auditor';
+    }
+
+    // =========================================================================
+    // VALIDATION BLUEPRINTS
+    // =========================================================================
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'name', 'email', 'role', 'status', 'revision', 'createdAt']) &&
+        data.keys().hasOnly(['uid', 'name', 'email', 'photo', 'role', 'status', 'organization', 'revision', 'createdAt']) &&
+        data.uid is string && data.uid.size() >= 1 && data.uid.size() <= 128 &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 200 &&
+        data.email is string && data.email.size() >= 3 && data.email.size() <= 254 &&
+        data.role in ['Super Admin', 'Admin', 'Lawyer', 'Document Writer', 'Broker', 'Client', 'Auditor', 'Data Entry Operator'] &&
+        data.status in ['Approved', 'Pending Approval', 'Suspended', 'Deleted'] &&
+        data.revision is int && data.revision >= 1 &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        (!('photo' in data) || (data.photo is string && data.photo.size() <= 1024)) &&
+        (!('organization' in data) || (data.organization is string && data.organization.size() <= 255));
+    }
+
+    function isValidDocument(data) {
+      return data.keys().hasAll(['docNo', 'docType', 'status', 'createdBy', 'createdByUserId', 'createdByEmail', 'revision', 'createdAt', 'modifiedAt']) &&
+        data.keys().hasOnly(['docNo', 'docType', 'subType', 'partiesCount', 'propertyAddress', 'consideration', 'status', 'writer', 'progress', 'createdBy', 'createdByUserId', 'createdByEmail', 'assignedToUserId', 'revision', 'createdAt', 'modifiedAt']) &&
+        data.docNo is string && data.docNo.size() >= 3 && data.docNo.size() <= 100 &&
+        data.docType is string && data.docType.size() >= 1 && data.docType.size() <= 100 &&
+        data.status in ['Draft', 'In Progress', 'Ready', 'Completed', 'Approved', 'Finalized'] &&
+        data.createdBy is string && data.createdBy.size() >= 3 && data.createdBy.size() <= 254 &&
+        data.createdByUserId is string && data.createdByUserId.size() >= 1 && data.createdByUserId.size() <= 128 &&
+        data.createdByEmail is string && data.createdByEmail.size() >= 3 && data.createdByEmail.size() <= 254 &&
+        data.revision is int && data.revision >= 1 &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        data.modifiedAt is string && data.modifiedAt.size() <= 64 &&
+        (!('subType' in data) || (data.subType is string && data.subType.size() <= 100)) &&
+        (!('partiesCount' in data) || (data.partiesCount is int && data.partiesCount >= 0 && data.partiesCount <= 100)) &&
+        (!('propertyAddress' in data) || (data.propertyAddress is string && data.propertyAddress.size() <= 1000)) &&
+        (!('consideration' in data) || (data.consideration is number && data.consideration >= 0)) &&
+        (!('writer' in data) || (data.writer is string && data.writer.size() <= 255)) &&
+        (!('progress' in data) || (data.progress is int && data.progress >= 0 && data.progress <= 100)) &&
+        (!('assignedToUserId' in data) || (data.assignedToUserId is string && data.assignedToUserId.size() <= 128));
+    }
+
+    function isValidClient(data) {
+      return data.keys().hasAll(['name', 'createdByUserId', 'createdByEmail', 'revision', 'createdAt']) &&
+        data.keys().hasOnly(['name', 'fatherName', 'dob', 'age', 'occupation', 'address', 'phone', 'email', 'createdByUserId', 'createdByEmail', 'assignedToUserId', 'revision', 'createdAt']) &&
+        data.name is string && data.name.size() >= 1 && data.name.size() <= 255 &&
+        data.createdByUserId is string && data.createdByUserId.size() >= 1 && data.createdByUserId.size() <= 128 &&
+        data.createdByEmail is string && data.createdByEmail.size() >= 3 && data.createdByEmail.size() <= 254 &&
+        data.revision is int && data.revision >= 1 &&
+        data.createdAt is string && data.createdAt.size() <= 64 &&
+        (!('fatherName' in data) || (data.fatherName is string && data.fatherName.size() <= 255)) &&
+        (!('dob' in data) || (data.dob is string && data.dob.size() <= 50)) &&
+        (!('age' in data) || (data.age is int && data.age >= 0 && data.age <= 150)) &&
+        (!('occupation' in data) || (data.occupation is string && data.occupation.size() <= 255)) &&
+        (!('address' in data) || (data.address is string && data.address.size() <= 1000)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 50)) &&
+        (!('email' in data) || (data.email is string && data.email.size() <= 254)) &&
+        (!('assignedToUserId' in data) || (data.assignedToUserId is string && data.assignedToUserId.size() <= 128));
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['timestamp', 'type', 'message', 'userId', 'userEmail']) &&
+        data.keys().hasOnly(['timestamp', 'type', 'message', 'ip', 'device', 'browser', 'userId', 'userEmail']) &&
+        data.timestamp is string && data.timestamp.size() <= 64 &&
+        data.type is string && data.type.size() >= 1 && data.type.size() <= 100 &&
+        data.message is string && data.message.size() >= 1 && data.message.size() <= 2000 &&
+        data.userId is string && data.userId == request.auth.uid &&
+        data.userEmail is string && data.userEmail == request.auth.token.email &&
+        (!('ip' in data) || (data.ip is string && data.ip.size() <= 64)) &&
+        (!('device' in data) || (data.device is string && data.device.size() <= 128)) &&
+        (!('browser' in data) || (data.browser is string && data.browser.size() <= 128));
+    }
+
+    // =========================================================================
+    // COLLECTION 1: /users/{userId}
+    // Ordinary users cannot self-promote or modify role, status, email, or uid.
+    // =========================================================================
+    match /users/{userId} {
+      allow get: if isValidId(userId) && (isOwner(userId) || isAdmin() || isAuditor());
+      allow list: if isSignedIn() && existing().uid == request.auth.uid;
+
+      allow create: if isValidId(userId) && isValidUser(incoming()) && (
+        isSuperAdmin() ||
+        (
+          isOwner(userId) &&
+          incoming().uid == request.auth.uid &&
+          incoming().email == request.auth.token.email &&
+          incoming().revision == 1 &&
+          (
+            (isSuperAdminAllowlisted() && incoming().role == 'Super Admin' && incoming().status == 'Approved') ||
+            (incoming().role == 'Client' && incoming().status == 'Pending Approval')
+          )
+        )
+      );
+
+      allow update: if isValidId(userId) && isValidUser(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().revision == existing().revision + 1 &&
+        (
+          isSuperAdmin() ||
+          (
+            isAdmin() &&
+            !(existing().role in ['Super Admin', 'Admin', 'Auditor']) &&
+            !(incoming().role in ['Super Admin', 'Admin', 'Auditor']) &&
+            incoming().email == existing().email
+          ) ||
+          (
+            isOwner(userId) &&
+            incoming().email == existing().email &&
+            incoming().role == existing().role &&
+            incoming().status == existing().status &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['name', 'photo', 'organization', 'revision'])
+          )
+        );
+
+      allow delete: if isValidId(userId) && isSuperAdmin();
+    }
+
+    // =========================================================================
+    // COLLECTION 2: /documents/{documentId}
+    // Strictly isolated to document creator/assignee or approved Admin/Auditor.
+    // Never globally readable or writable by all signed-in users.
+    // =========================================================================
+    match /documents/{documentId} {
+      allow get: if isValidId(documentId) && (
+        (hasApprovedProfile() && (existing().createdByUserId == request.auth.uid || existing().assignedToUserId == request.auth.uid)) ||
+        isAdmin() ||
+        isAuditor()
+      );
+
+      allow list: if isSignedIn() && existing().createdByUserId == request.auth.uid;
+
+      allow create: if isValidId(documentId) &&
+        hasApprovedProfile() &&
+        !isAuditor() &&
+        isValidDocument(incoming()) &&
+        incoming().createdByUserId == request.auth.uid &&
+        incoming().createdByEmail == request.auth.token.email &&
+        incoming().revision == 1;
+
+      allow update: if isValidId(documentId) &&
+        hasApprovedProfile() &&
+        !isAuditor() &&
+        isValidDocument(incoming()) &&
+        existing().status != 'Finalized' &&
+        incoming().docNo == existing().docNo &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdByUserId == existing().createdByUserId &&
+        incoming().createdByEmail == existing().createdByEmail &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().revision == existing().revision + 1 &&
+        (
+          existing().createdByUserId == request.auth.uid ||
+          existing().assignedToUserId == request.auth.uid ||
+          isAdmin()
+        );
+
+      allow delete: if isValidId(documentId) &&
+        hasApprovedProfile() &&
+        !isAuditor() &&
+        existing().status != 'Finalized' &&
+        (existing().createdByUserId == request.auth.uid || isAdmin());
+    }
+
+    // =========================================================================
+    // COLLECTION 3: /clients/{clientId}
+    // Strictly isolated to client creator/assignee or approved Admin/Auditor.
+    // =========================================================================
+    match /clients/{clientId} {
+      allow get: if isValidId(clientId) && (
+        (hasApprovedProfile() && (existing().createdByUserId == request.auth.uid || existing().assignedToUserId == request.auth.uid)) ||
+        isAdmin() ||
+        isAuditor()
+      );
+
+      allow list: if isSignedIn() && existing().createdByUserId == request.auth.uid;
+
+      allow create: if isValidId(clientId) &&
+        hasApprovedProfile() &&
+        !isAuditor() &&
+        isValidClient(incoming()) &&
+        incoming().createdByUserId == request.auth.uid &&
+        incoming().createdByEmail == request.auth.token.email &&
+        incoming().revision == 1;
+
+      allow update: if isValidId(clientId) &&
+        hasApprovedProfile() &&
+        !isAuditor() &&
+        isValidClient(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdByUserId == existing().createdByUserId &&
+        incoming().createdByEmail == existing().createdByEmail &&
+        incoming().revision == existing().revision + 1 &&
+        (
+          existing().createdByUserId == request.auth.uid ||
+          existing().assignedToUserId == request.auth.uid ||
+          isAdmin()
+        );
+
+      allow delete: if isValidId(clientId) &&
+        hasApprovedProfile() &&
+        !isAuditor() &&
+        (existing().createdByUserId == request.auth.uid || isAdmin());
+    }
+
+    // =========================================================================
+    // COLLECTION 4: /audit_logs/{logId}
+    // Append-only for approved users; readable only by Admin/Auditor.
+    // =========================================================================
+    match /audit_logs/{logId} {
+      allow get: if isValidId(logId) && (isAdmin() || isAuditor());
+      allow list: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isValidId(logId) && hasApprovedProfile() && isValidAuditLog(incoming());
+      allow update, delete: if false;
+    }
+  }
+}

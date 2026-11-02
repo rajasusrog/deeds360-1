@@ -1,0 +1,6 @@
+{
+  "name": "DeedOS360 by Unikorn360 AI Solutions",
+  "description": "DeedOS360 by Unikorn360 AI Solutions - Tamil Nadu Star 2.0 automated survey, valuation & deed drafting registry system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
